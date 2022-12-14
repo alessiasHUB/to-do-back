@@ -1,51 +1,51 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import {
-  addDbItems,
-  getAllDbItems,
-  getDbItemById,
-  DbItem,
-  updateDbItemById,
-  deleteCompletedItems,
-  deleteDbItemById
-} from "./db";
+// import {
+//   addDbItems,
+//   getAllDbItems,
+//   getDbItemById,
+//   DbItem,
+//   updateDbItemById,
+//   deleteCompletedItems,
+//   deleteDbItemById
+// } from "./db";
+import { Client } from "pg";
+
+const client = new Client(process.env.DATABASE_URL);
+
 import filePath from "./filePath";
 
 export interface taskText {
   task: string;
 }
 
-const app = express();
+client.connect();
 
-/** Parses JSON data in a request automatically */
+const app = express();
 app.use(express.json());
-/** To allow 'Cross-Origin Resource Sharing': https://en.wikipedia.org/wiki/Cross-origin_resource_sharing */
 app.use(cors());
 
 // read in contents of any environment variables in the .env file
 dotenv.config();
 
-// use the environment variable PORT, or 4000 as a fallback
 const PORT_NUMBER = process.env.PORT ?? 4000;
 
-// API info page
+//API info page
 app.get("/", (req, res) => {
   const pathToFile = filePath("../public/index.html");
   res.sendFile(pathToFile);
 });
 
 // GET /items
-app.get("/items", (req, res) => {
-  const allItems = getAllDbItems();
-  res.status(200).json(allItems);
-});
-
-// POST /items
-app.post<{}, {}, DbItem>("/items", (req, res) => {
-  const postData = req.body;
-  const createdItem = addDbItems(postData);
-  res.status(201).json(createdItem);
+app.get("/items", async (req, res) => {
+  const allItems = await client.query('select * from signatures;');
+  res.status(200).json({
+    status: "success",
+    data: {
+      allItems
+    },
+  });
 });
 
 // GET /items/:id
@@ -56,6 +56,13 @@ app.get<{ id: string }>("/items/:id", (req, res) => {
   } else {
     res.status(200).json(matchingItem);
   }
+});
+
+// POST /items
+app.post<{}, {}, DbItem>("/items", (req, res) => {
+  const postData = req.body;
+  const createdItem = addDbItems(postData);
+  res.status(201).json(createdItem);
 });
 
 // DELETE /items/:id
