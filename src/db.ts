@@ -1,37 +1,14 @@
+import { taskText } from "./server";
 export interface DbItem {
+  id: number;
   task: string;
   completed: boolean;
-  // creationDate: string;
-  // dueDate: string | null;
 }
 
-export interface DbItemWithId extends DbItem {
-  id: number;
-}
-
-const db: DbItemWithId[] = [];
+const db: DbItem[] = [];
 
 /** Variable to keep incrementing id of database items */
 let idCounter = 0;
-
-/**
- * Adds in some dummy database items to the database
- *
- * @param n - the number of items to generate
- * @returns the created items
- */
-export const addDummyDbItems = (n: number): DbItemWithId[] => {
-  const createdSignatures: DbItemWithId[] = [];
-  for (let count = 0; count < n; count++) {
-    const createdSignature = addDbItem({
-      // possibly add some generated data here
-      task: 'First thing to do',
-      completed: false
-    });
-    createdSignatures.push(createdSignature);
-  }
-  return createdSignatures;
-};
 
 /**
  * Adds in a single item to the database
@@ -39,13 +16,14 @@ export const addDummyDbItems = (n: number): DbItemWithId[] => {
  * @param data - the item data to insert in
  * @returns the item added (with a newly created id)
  */
-export const addDbItem = (data: DbItem): DbItemWithId => {
-  const newEntry: DbItemWithId = {
+export const addDbItems = (data: taskText): DbItem => {
+  const newItem: DbItem = {
     id: ++idCounter,
-    ...data,
+    task: data.task,
+    completed: false,
   };
-  db.push(newEntry);
-  return newEntry;
+  db.unshift(newItem);
+  return newItem;
 };
 
 /**
@@ -55,7 +33,7 @@ export const addDbItem = (data: DbItem): DbItemWithId => {
  * @returns the deleted database item (if originally located),
  *  otherwise the string `"not found"`
  */
-export const deleteDbItemById = (id: number): DbItemWithId | "not found" => {
+export const deleteDbItemById = (id: number): DbItem | "not found" => {
   const idxToDeleteAt = findIndexOfDbItemById(id);
   if (typeof idxToDeleteAt === "number") {
     const itemToDelete = getDbItemById(id);
@@ -64,6 +42,29 @@ export const deleteDbItemById = (id: number): DbItemWithId | "not found" => {
   } else {
     return "not found";
   }
+};
+
+/**
+ * Deletes all completed to-dos
+ *
+ * @returns an array of the deleted database items (if originally located),
+ *  otherwise the string `"not found"`
+ */
+export const deleteCompletedItems = ():
+  | DbItem[]
+  | "no completed items found" => {
+  const deletedItems: DbItem[] = [];
+  for (let i = 0; i < db.length; i++) {
+    if (db[i].completed === true) {
+      const deletedItem = db.splice(Number(i), 1);
+      deletedItems.push(deletedItem[0]);
+      i--;
+    }
+  }
+  if (deletedItems.length > 0) {
+    return deletedItems;
+  }
+  return "no completed items found";
 };
 
 /**
@@ -87,7 +88,7 @@ const findIndexOfDbItemById = (id: number): number | "not found" => {
  * Find all database items
  * @returns all database items from the database
  */
-export const getAllDbItems = (): DbItemWithId[] => {
+export const getAllDbItems = (): DbItem[] => {
   return db;
 };
 
@@ -98,7 +99,7 @@ export const getAllDbItems = (): DbItemWithId[] => {
  * @returns the located database item (if found),
  *  otherwise the string `"not found"`
  */
-export const getDbItemById = (id: number): DbItemWithId | "not found" => {
+export const getDbItemById = (id: number): DbItem | "not found" => {
   const maybeEntry = db.find((entry) => entry.id === id);
   if (maybeEntry) {
     return maybeEntry;
@@ -119,7 +120,7 @@ export const getDbItemById = (id: number): DbItemWithId | "not found" => {
 export const updateDbItemById = (
   id: number,
   newData: Partial<DbItem>
-): DbItemWithId | "not found" => {
+): DbItem | "not found" => {
   const idxOfEntry = findIndexOfDbItemById(id);
   // type guard against "not found"
   if (typeof idxOfEntry === "number") {
