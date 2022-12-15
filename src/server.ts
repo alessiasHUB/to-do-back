@@ -1,35 +1,26 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-// import {
-//   addDbItems,
-//   getAllDbItems,
-//   getDbItemById,
-//   DbItem,
-//   updateDbItemById,
-//   deleteCompletedItems,
-//   deleteDbItemById
-// } from "./db";
 import { Client } from "pg";
-
-const client = new Client(process.env.DATABASE_URL);
-
 import filePath from "./filePath";
-
-export interface taskText {
-  task: string;
-}
-
-client.connect();
 
 const app = express();
 app.use(express.json());
 app.use(cors());
-
-// read in contents of any environment variables in the .env file
 dotenv.config();
-
 const PORT_NUMBER = process.env.PORT ?? 4000;
+const client = new Client(process.env.DATABASE_URL);
+client.connect();
+
+export interface DbItem {
+  id: number;
+  task: string;
+  completed: boolean;
+}
+
+export interface taskText {
+  task: string;
+}
 
 //API info page
 app.get("/", (req, res) => {
@@ -39,61 +30,117 @@ app.get("/", (req, res) => {
 
 // GET /items
 app.get("/items", async (req, res) => {
-  const allItems = await client.query('select * from signatures;');
-  res.status(200).json({
-    status: "success",
-    data: {
-      allItems
-    },
-  });
+  try {
+    const queryResponse = await client.query(`select * from todos`);
+    const allItems = queryResponse.rows;
+    res.status(200).json(allItems);
+  } catch (err) {
+    console.error(err);
+  }
 });
 
 // GET /items/:id
-app.get<{ id: string }>("/items/:id", (req, res) => {
-  const matchingItem = getDbItemById(parseInt(req.params.id));
-  if (matchingItem === "not found") {
-    res.status(404).json(matchingItem);
-  } else {
-    res.status(200).json(matchingItem);
+app.get<{ id: string }>("/items/:id", async(req, res) => {
+  try {
+    const id = req.params.id;
+    const values = [id];
+    const queryResponse = await client.query(`
+      select * 
+      from todos 
+      where id = $1
+    `, values);
+    const matchingToDo = queryResponse.rows[0];
+    res.status(200).json(matchingToDo);
+  } catch (err) {
+    console.error(err);
   }
 });
 
 // POST /items
-app.post<{}, {}, DbItem>("/items", (req, res) => {
-  const postData = req.body;
-  const createdItem = addDbItems(postData);
-  res.status(201).json(createdItem);
+app.post<{}, {}, DbItem>("/items", async (req, res) => {
+  try {
+    const values = [req.body.task];
+    const queryResponse = await client.query(`
+      insert into todos (task) 
+      values ($1) 
+      returning *
+    `, values);
+    const createdItem = queryResponse.rows[0];
+    res.status(201).json(createdItem);
+  } catch (err) {
+    console.error(err);
+  }
 });
 
 // DELETE /items/:id
-app.delete<{ id: string }>("/items/:id", (req, res) => {
-  const matchingItem = getDbItemById(parseInt(req.params.id));
-  
-  if (matchingItem === "not found") {
-    res.status(404).json(matchingItem);
-  } else {
-    deleteDbItemById(parseInt(req.params.id))
-    res.status(200).json(matchingItem);
+app.delete<{ id: string }>("/items/:id", async (req, res) => {
+  const values = [req.params.id];
+  try {
+    const queryResponse = await client.query(`
+      delete * 
+      from todos
+      where id = $1
+      returning *
+    `, values);
+    const removedItem = queryResponse.rows[0];
+    res.status(200).json(removedItem);
+  } catch (err) {
+    console.error(err);
   }
 });
 
 // DELETE /completed-items
-app.delete("/completed-items", (req, res) => {
-  const completedArr = deleteCompletedItems();
-  if (completedArr === "no completed items found") {
-    res.status(404).json(completedArr);
-  } else {
-    res.status(200).json(completedArr);
+app.delete("/completed-items", async (req, res) => {
+  try {
+    const queryResponse = await client.query(`
+      delete from todos 
+      where completed = true 
+      returning *
+    `);
+    const returnedItems = queryResponse.rows;
+    res.status(200).json(returnedItems);
+  } catch (err) {
+    console.error(err);
   }
 });
 
 // PATCH /items/:id
-app.patch<{ id: string }, {}, Partial<DbItem>>("/items/:id", (req, res) => {
-  const matchingItem = updateDbItemById(parseInt(req.params.id), req.body);
-  if (matchingItem === "not found") {
-    res.status(404).json(matchingItem);
-  } else {
-    res.status(200).json(matchingItem);
+app.patch<{ id: string }, {}, Partial<DbItem>>("/items/:id", async (req, res) => {
+  const patchData = req.body;
+  try {
+    if (patchData.task && patchData.completed !== undefined) {
+      const values = [patchData.task,patchData.completed, req.params.id];
+      const queryResponse = await client.query(`
+        update todos
+        set task = $1, completed = $2
+        where id = $3
+        returning *
+      `,values);
+      const updatedItem = queryResponse.rows[0];
+      res.status(200).json(updatedItem);
+    } else if (patchData.task === undefined && patchData.completed !== undefined) {
+      const values = [patchData.completed, req.params.id];
+      const queryResponse = await client.query(`
+        update todos
+        set complete = $1
+        where id = $2
+        returning *
+      `, values);
+      const updatedItem = queryResponse.rows[0];
+      res.status(200).json(updatedItem);
+    } else if (patchData.task && patchData.completed === undefined) {
+      const values = [patchData.task, req.params.id];
+      const queryResponse = await client.query(`
+        update todos
+        set task = $1
+        where id = $2
+        returning *  
+      `, values);
+      const updatedItem = queryResponse.rows[0];
+      res.status(200).json(updatedItem);
+    }
+  } catch (err) {
+    console.error(err);
   }
 });
 
