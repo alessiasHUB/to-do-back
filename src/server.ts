@@ -22,6 +22,10 @@ export interface taskText {
   task: string;
 }
 
+// THINGS TO FIX:
+// make sure the order doesn't change when complete-button us pressed
+// CSS
+
 //API info page
 app.get("/", (req, res) => {
   const pathToFile = filePath("../public/index.html");
