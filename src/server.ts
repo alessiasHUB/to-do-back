@@ -40,15 +40,18 @@ app.get("/items", async (req, res) => {
 });
 
 // GET /items/:id
-app.get<{ id: string }>("/items/:id", async(req, res) => {
+app.get<{ id: string }>("/items/:id", async (req, res) => {
   try {
     const id = req.params.id;
     const values = [id];
-    const queryResponse = await client.query(`
+    const queryResponse = await client.query(
+      `
       select * 
       from todos 
       where id = $1
-    `, values);
+    `,
+      values
+    );
     const matchingToDo = queryResponse.rows[0];
     res.status(200).json(matchingToDo);
   } catch (err) {
@@ -60,11 +63,14 @@ app.get<{ id: string }>("/items/:id", async(req, res) => {
 app.post<{}, {}, DbItem>("/items", async (req, res) => {
   try {
     const values = [req.body.task];
-    const queryResponse = await client.query(`
+    const queryResponse = await client.query(
+      `
       insert into todos (task) 
       values ($1) 
       returning *
-    `, values);
+    `,
+      values
+    );
     const createdItem = queryResponse.rows[0];
     res.status(201).json(createdItem);
   } catch (err) {
@@ -76,12 +82,15 @@ app.post<{}, {}, DbItem>("/items", async (req, res) => {
 app.delete<{ id: string }>("/items/:id", async (req, res) => {
   const values = [req.params.id];
   try {
-    const queryResponse = await client.query(`
+    const queryResponse = await client.query(
+      `
       delete * 
       from todos
       where id = $1
       returning *
-    `, values);
+    `,
+      values
+    );
     const removedItem = queryResponse.rows[0];
     res.status(200).json(removedItem);
   } catch (err) {
@@ -105,44 +114,59 @@ app.delete("/completed-items", async (req, res) => {
 });
 
 // PATCH /items/:id
-app.patch<{ id: string }, {}, Partial<DbItem>>("/items/:id", async (req, res) => {
-  const patchData = req.body;
-  try {
-    if (patchData.task && patchData.completed !== undefined) {
-      const values = [patchData.task,patchData.completed, req.params.id];
-      const queryResponse = await client.query(`
+app.patch<{ id: string }, {}, Partial<DbItem>>(
+  "/items/:id",
+  async (req, res) => {
+    const patchData = req.body;
+    try {
+      if (patchData.task && patchData.completed !== undefined) {
+        const values = [patchData.task, patchData.completed, req.params.id];
+        const queryResponse = await client.query(
+          `
         update todos
         set task = $1, completed = $2
         where id = $3
         returning *
-      `,values);
-      const updatedItem = queryResponse.rows[0];
-      res.status(200).json(updatedItem);
-    } else if (patchData.task === undefined && patchData.completed !== undefined) {
-      const values = [patchData.completed, req.params.id];
-      const queryResponse = await client.query(`
+      `,
+          values
+        );
+        const updatedItem = queryResponse.rows[0];
+        res.status(200).json(updatedItem);
+      } else if (
+        patchData.task === undefined &&
+        patchData.completed !== undefined
+      ) {
+        const values = [patchData.completed, req.params.id];
+        const queryResponse = await client.query(
+          `
         update todos
         set complete = $1
         where id = $2
         returning *
-      `, values);
-      const updatedItem = queryResponse.rows[0];
-      res.status(200).json(updatedItem);
-    } else if (patchData.task && patchData.completed === undefined) {
-      const values = [patchData.task, req.params.id];
-      const queryResponse = await client.query(`
+      `,
+          values
+        );
+        const updatedItem = queryResponse.rows[0];
+        res.status(200).json(updatedItem);
+      } else if (patchData.task && patchData.completed === undefined) {
+        const values = [patchData.task, req.params.id];
+        const queryResponse = await client.query(
+          `
         update todos
         set task = $1
         where id = $2
         returning *  
-      `, values);
-      const updatedItem = queryResponse.rows[0];
-      res.status(200).json(updatedItem);
+      `,
+          values
+        );
+        const updatedItem = queryResponse.rows[0];
+        res.status(200).json(updatedItem);
+      }
+    } catch (err) {
+      console.error(err);
     }
-  } catch (err) {
-    console.error(err);
   }
-});
+);
 
 app.listen(PORT_NUMBER, () => {
   console.log(`Server is listening on port ${PORT_NUMBER}!`);
