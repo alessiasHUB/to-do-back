@@ -52,8 +52,8 @@ app.get<{ id: string }>("/items/:id", async (req, res) => {
     `,
       values
     );
-    const matchingToDo = queryResponse.rows[0];
-    res.status(200).json(matchingToDo);
+    const matchingTodo = queryResponse.rows[0];
+    res.status(200).json(matchingTodo);
   } catch (err) {
     console.error(err);
   }
@@ -84,8 +84,7 @@ app.delete<{ id: string }>("/items/:id", async (req, res) => {
   try {
     const queryResponse = await client.query(
       `
-      delete * 
-      from todos
+      delete from todos
       where id = $1
       returning *
     `,
@@ -93,6 +92,7 @@ app.delete<{ id: string }>("/items/:id", async (req, res) => {
     );
     const removedItem = queryResponse.rows[0];
     res.status(200).json(removedItem);
+    // add if statement if rows are NOT 1
   } catch (err) {
     console.error(err);
   }
@@ -140,7 +140,7 @@ app.patch<{ id: string }, {}, Partial<DbItem>>(
         const queryResponse = await client.query(
           `
         update todos
-        set complete = $1
+        set completed = $1
         where id = $2
         returning *
       `,
