@@ -16,6 +16,7 @@ export interface DbItem {
   id: number;
   task: string;
   completed: boolean;
+  dueDate?: Date;
 }
 
 export interface taskText {
@@ -31,7 +32,11 @@ app.get("/", (req, res) => {
 // GET /items
 app.get("/items", async (req, res) => {
   try {
-    const queryResponse = await client.query(`select * from todos`);
+    const queryResponse = await client.query(`
+      select * 
+      from todos
+      order by id DESC
+    `);
     const allItems = queryResponse.rows;
     res.status(200).json(allItems);
   } catch (err) {
@@ -62,11 +67,16 @@ app.get<{ id: string }>("/items/:id", async (req, res) => {
 // POST /items
 app.post<{}, {}, DbItem>("/items", async (req, res) => {
   try {
-    const values = [req.body.task];
+    const values: (string | Date | null)[] = [req.body.task];
+    if (req.body.dueDate) {
+      values.push(req.body.dueDate);
+    } else {
+      values.push(null);
+    }
     const queryResponse = await client.query(
       `
-      insert into todos (task) 
-      values ($1) 
+      insert into todos (task, due_date) 
+      values ($1, $2) 
       returning *
     `,
       values
@@ -118,50 +128,30 @@ app.patch<{ id: string }, {}, Partial<DbItem>>(
   "/items/:id",
   async (req, res) => {
     const patchData = req.body;
+    const values = [];
+    let query = `update todos set`;
+
+    if (patchData.task) {
+      query += ` task = $${values.length + 1},`;
+      values.push(patchData.task);
+    }
+    if (patchData.completed !== undefined) {
+      query += ` completed = $${values.length + 1},`;
+      values.push(patchData.completed);
+    }
+    // if (patchData.dueDate !== undefined) {
+    //   query += ` due_date = $${values.length + 1},`;
+    //   values.push(patchData.dueDate);
+    // }
+
+    query =
+      query.slice(0, -1) + ` where id = $${values.length + 1} returning *`;
+    values.push(req.params.id);
+
     try {
-      if (patchData.task && patchData.completed !== undefined) {
-        const values = [patchData.task, patchData.completed, req.params.id];
-        const queryResponse = await client.query(
-          `
-        update todos
-        set task = $1, completed = $2
-        where id = $3
-        returning *
-      `,
-          values
-        );
-        const updatedItem = queryResponse.rows[0];
-        res.status(200).json(updatedItem);
-      } else if (
-        patchData.task === undefined &&
-        patchData.completed !== undefined
-      ) {
-        const values = [patchData.completed, req.params.id];
-        const queryResponse = await client.query(
-          `
-        update todos
-        set completed = $1
-        where id = $2
-        returning *
-      `,
-          values
-        );
-        const updatedItem = queryResponse.rows[0];
-        res.status(200).json(updatedItem);
-      } else if (patchData.task && patchData.completed === undefined) {
-        const values = [patchData.task, req.params.id];
-        const queryResponse = await client.query(
-          `
-        update todos
-        set task = $1
-        where id = $2
-        returning *  
-      `,
-          values
-        );
-        const updatedItem = queryResponse.rows[0];
-        res.status(200).json(updatedItem);
-      }
+      const queryResponse = await client.query(query, values);
+      const updatedItem = queryResponse.rows[0];
+      res.status(200).json(updatedItem);
     } catch (err) {
       console.error(err);
     }
